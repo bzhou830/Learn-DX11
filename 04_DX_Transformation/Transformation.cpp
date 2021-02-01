@@ -439,7 +439,7 @@ void Render()
     // Update our time
     static float t = 0.0f;
     static DWORD dwTimeStart = 0;
-    DWORD dwTimeCur = GetTickCount();
+    DWORD dwTimeCur = GetTickCount64();
     if (dwTimeStart == 0)
         dwTimeStart = dwTimeCur;
     t = (dwTimeCur - dwTimeStart) / 1000.0f;
@@ -448,8 +448,8 @@ void Render()
     g_World1 = DirectX::XMMatrixRotationY(t);
 
     // 2nd Cube:  Rotate around origin
-    DirectX::XMMATRIX mSpin = DirectX::XMMatrixRotationZ(-t);
-    DirectX::XMMATRIX mOrbit = DirectX::XMMatrixRotationY(-t * 2.0f);
+    DirectX::XMMATRIX mSpin = DirectX::XMMatrixIdentity();//DirectX::XMMatrixRotationZ(-t);
+    DirectX::XMMATRIX mOrbit = DirectX::XMMatrixRotationZ(-t * 2.0f);
     DirectX::XMMATRIX mTranslate = DirectX::XMMatrixTranslation(-4.0f, 0.0f, 0.0f);
     DirectX::XMMATRIX mScale = DirectX::XMMatrixScaling(0.3f, 0.3f, 0.3f);
 

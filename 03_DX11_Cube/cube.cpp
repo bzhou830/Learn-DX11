@@ -413,7 +413,7 @@ void Render()
     // Update our time
     static float t = 0.0f;
     static DWORD dwTimeStart = 0;
-    DWORD dwTimeCur = GetTickCount();
+    DWORD dwTimeCur = GetTickCount64();
     if (dwTimeStart == 0)
         dwTimeStart = dwTimeCur;
     t = (dwTimeCur - dwTimeStart) / 1000.0f;
