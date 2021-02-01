@@ -33,13 +33,16 @@ ID3D11Device*           g_pd3dDevice = NULL;
 ID3D11DeviceContext*    g_pImmediateContext = NULL;
 IDXGISwapChain*         g_pSwapChain = NULL;
 ID3D11RenderTargetView* g_pRenderTargetView = NULL;
+ID3D11Texture2D*        g_pDepthStencil = NULL;
+ID3D11DepthStencilView* g_pDepthStencilView = NULL;
 ID3D11VertexShader*     g_pVertexShader = NULL;
 ID3D11PixelShader*      g_pPixelShader = NULL;
 ID3D11InputLayout*      g_pVertexLayout = NULL;
 ID3D11Buffer*           g_pVertexBuffer = NULL;
 ID3D11Buffer*           g_pIndexBuffer = NULL;
 ID3D11Buffer*           g_pConstantBuffer = NULL;
-DirectX::XMMATRIX       g_World;
+DirectX::XMMATRIX       g_World1;
+DirectX::XMMATRIX       g_World2;
 DirectX::XMMATRIX       g_View;
 DirectX::XMMATRIX       g_Projection;
 
@@ -142,11 +145,9 @@ HRESULT CreateShaderFromFile(const WCHAR* csoFileNameInOut, const WCHAR* hlslFil
     {
         DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #ifdef _DEBUG
-        // 设置 D3DCOMPILE_DEBUG 标志用于获取着色器调试信息。该标志可以提升调试体验，
-        // 但仍然允许着色器进行优化操作
+        // 设置 D3DCOMPILE_DEBUG 标志用于获取着色器调试信息。该标志可以提升调试体验，但仍然允许着色器进行优化操作
         dwShaderFlags |= D3DCOMPILE_DEBUG;
-        // 在Debug环境下禁用优化以避免出现一些不合理的情况
-        dwShaderFlags |= D3DCOMPILE_SKIP_OPTIMIZATION;
+        dwShaderFlags |= D3DCOMPILE_SKIP_OPTIMIZATION;// 在Debug环境下禁用优化以避免出现一些不合理的情况
 #endif
         ID3DBlob* errorBlob = nullptr;
         hr = D3DCompileFromFile(hlslFileName, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint, shaderModel, dwShaderFlags, 0, ppBlobOut, &errorBlob);
@@ -158,7 +159,6 @@ HRESULT CreateShaderFromFile(const WCHAR* csoFileNameInOut, const WCHAR* hlslFil
             }
             return hr;
         }
-
         // 若指定了输出文件名，则将着色器二进制信息输出
         if (csoFileNameInOut)
         {
@@ -238,6 +238,37 @@ HRESULT InitDevice()
     if (FAILED(hr))
         return hr;
 
+    // Create depth stencil texture
+    D3D11_TEXTURE2D_DESC descDepth;
+    ZeroMemory(&descDepth, sizeof(descDepth));
+    descDepth.Width = width;
+    descDepth.Height = height;
+    descDepth.MipLevels = 1;
+    descDepth.ArraySize = 1;
+    descDepth.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    descDepth.SampleDesc.Count = 1;
+    descDepth.SampleDesc.Quality = 0;
+    descDepth.Usage = D3D11_USAGE_DEFAULT;
+    descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+    descDepth.CPUAccessFlags = 0;
+    descDepth.MiscFlags = 0;
+    hr = g_pd3dDevice->CreateTexture2D(&descDepth, NULL, &g_pDepthStencil);
+    if (FAILED(hr))
+        return hr;
+
+    // Create the depth stencil view
+    D3D11_DEPTH_STENCIL_VIEW_DESC descDSV;
+    ZeroMemory(&descDSV, sizeof(descDSV));
+    descDSV.Format = descDepth.Format;
+    descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    descDSV.Texture2D.MipSlice = 0;
+    hr = g_pd3dDevice->CreateDepthStencilView(g_pDepthStencil, &descDSV, &g_pDepthStencilView);
+    if (FAILED(hr))
+        return hr;
+
+    g_pImmediateContext->OMSetRenderTargets(1, &g_pRenderTargetView, g_pDepthStencilView);
+
+    
     ID3D11RasterizerState* pRsState;
     D3D11_RASTERIZER_DESC rd = {};
 
@@ -245,7 +276,7 @@ HRESULT InitDevice()
     rd.FillMode = D3D11_FILL_MODE::D3D11_FILL_WIREFRAME;
     g_pd3dDevice->CreateRasterizerState(&rd, &pRsState);
     g_pImmediateContext->RSSetState(pRsState);
-
+    
     g_pImmediateContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
 
     // Setup the viewport
@@ -384,11 +415,12 @@ HRESULT InitDevice()
         return hr;
 
     // Initialize the world matrix
-    g_World = DirectX::XMMatrixIdentity();
+    g_World1 = DirectX::XMMatrixIdentity();
+    g_World2 = DirectX::XMMatrixIdentity();
 
     // Initialize the view matrix
-    DirectX::XMVECTOR Eye = DirectX::XMVectorSet(0.0f, 0.0f, -3.0f, 0.0f);
-    DirectX::XMVECTOR At = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+    DirectX::XMVECTOR Eye = DirectX::XMVectorSet(0.0f, 0.0f, 6.0f, 0.0f);
+    DirectX::XMVECTOR At = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
     DirectX::XMVECTOR Up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
     g_View = DirectX::XMMatrixLookAtLH(Eye, At, Up);
 
@@ -413,24 +445,43 @@ void Render()
     t = (dwTimeCur - dwTimeStart) / 1000.0f;
 
     // Animate the cube
-    g_World = DirectX::XMMatrixRotationY(t);
+    g_World1 = DirectX::XMMatrixRotationY(t);
+
+    // 2nd Cube:  Rotate around origin
+    DirectX::XMMATRIX mSpin = DirectX::XMMatrixRotationZ(-t);
+    DirectX::XMMATRIX mOrbit = DirectX::XMMatrixRotationY(-t * 2.0f);
+    DirectX::XMMATRIX mTranslate = DirectX::XMMatrixTranslation(-4.0f, 0.0f, 0.0f);
+    DirectX::XMMATRIX mScale = DirectX::XMMatrixScaling(0.3f, 0.3f, 0.3f);
+
+    g_World2 = mScale * mSpin * mTranslate * mOrbit;
 
     // Clear the back buffer
     float ClearColor[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red,green,blue,alpha
     g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, ClearColor);
 
-    // Update variables
-    ConstantBuffer cb;
-    cb.mWorld = DirectX::XMMatrixTranspose(g_World);
-    cb.mView = DirectX::XMMatrixTranspose(g_View);
-    cb.mProjection = DirectX::XMMatrixTranspose(g_Projection);
-    g_pImmediateContext->UpdateSubresource(g_pConstantBuffer, 0, NULL, &cb, 0, 0);
+    g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-    // Renders a triangle
+    // Update variables
+    ConstantBuffer cb1;
+    cb1.mWorld = DirectX::XMMatrixTranspose(g_World1);
+    cb1.mView = DirectX::XMMatrixTranspose(g_View);
+    cb1.mProjection = DirectX::XMMatrixTranspose(g_Projection);
+    g_pImmediateContext->UpdateSubresource(g_pConstantBuffer, 0, NULL, &cb1, 0, 0);
+
+    // render the first cube.
     g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
     g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pConstantBuffer);
     g_pImmediateContext->PSSetShader(g_pPixelShader, NULL, 0);
     g_pImmediateContext->DrawIndexed(36, 0, 0);        // 36 vertices needed for 12 triangles in a triangle list
+
+    ConstantBuffer cb2;
+    cb2.mWorld = DirectX::XMMatrixTranspose(g_World2);
+    cb2.mView = DirectX::XMMatrixTranspose(g_View);
+    cb2.mProjection = DirectX::XMMatrixTranspose(g_Projection);
+    g_pImmediateContext->UpdateSubresource(g_pConstantBuffer, 0, NULL, &cb2, 0, 0);
+
+    // render the second cube.
+    g_pImmediateContext->DrawIndexed(36, 0, 0);
 
     // Present our back buffer to our front buffer
     g_pSwapChain->Present(0, 0);
@@ -447,6 +498,8 @@ void CleanupDevice()
     if (g_pVertexShader) g_pVertexShader->Release();
     if (g_pPixelShader) g_pPixelShader->Release();
     if (g_pRenderTargetView) g_pRenderTargetView->Release();
+    if (g_pDepthStencil) g_pDepthStencil->Release();
+    if (g_pDepthStencilView) g_pDepthStencilView->Release();
     if (g_pSwapChain) g_pSwapChain->Release();
     if (g_pImmediateContext) g_pImmediateContext->Release();
     if (g_pd3dDevice) g_pd3dDevice->Release();
