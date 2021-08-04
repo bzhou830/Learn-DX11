@@ -10,8 +10,9 @@ HINSTANCE               g_hInst = NULL;
 HWND                    g_hWnd = NULL;
 D3D_DRIVER_TYPE         g_driverType = D3D_DRIVER_TYPE_NULL;
 D3D_FEATURE_LEVEL       g_featureLevel = D3D_FEATURE_LEVEL_11_0;
+
 ID3D11Device*           g_pd3dDevice = NULL;
-ID3D11DeviceContext*    g_pImmediateContext = NULL;
+ID3D11DeviceContext*    g_pContext = NULL;
 IDXGISwapChain*         g_pSwapChain = NULL;
 ID3D11RenderTargetView* g_pRenderTargetView = NULL;
 
@@ -180,7 +181,7 @@ HRESULT InitDevice()
     {
         g_driverType = driverTypes[driverTypeIndex];
         hr = D3D11CreateDeviceAndSwapChain(NULL, g_driverType, NULL, createDeviceFlags, featureLevels, numFeatureLevels,
-            D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &g_featureLevel, &g_pImmediateContext);
+            D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &g_featureLevel, &g_pContext);
         if (SUCCEEDED(hr))
             break;
     }
@@ -198,7 +199,7 @@ HRESULT InitDevice()
     if (FAILED(hr))
         return hr;
 
-    g_pImmediateContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
+    g_pContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
 
     // Setup the viewport
     D3D11_VIEWPORT vp;
@@ -208,7 +209,7 @@ HRESULT InitDevice()
     vp.MaxDepth = 1.0f;
     vp.TopLeftX = 0;
     vp.TopLeftY = 0;
-    g_pImmediateContext->RSSetViewports(1, &vp);
+    g_pContext->RSSetViewports(1, &vp);
 
     return S_OK;
 }
@@ -221,7 +222,7 @@ void Render()
 {
     // Just clear the backbuffer
     float ClearColor[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; //red,green,blue,alpha
-    g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, ClearColor);
+    g_pContext->ClearRenderTargetView(g_pRenderTargetView, ClearColor);
     g_pSwapChain->Present(0, 0);
 }
 
@@ -231,10 +232,10 @@ void Render()
 //--------------------------------------------------------------------------------------
 void CleanupDevice()
 {
-    if (g_pImmediateContext) g_pImmediateContext->ClearState();
+    if (g_pContext) g_pContext->ClearState();
 
     if (g_pRenderTargetView) g_pRenderTargetView->Release();
     if (g_pSwapChain) g_pSwapChain->Release();
-    if (g_pImmediateContext) g_pImmediateContext->Release();
+    if (g_pContext) g_pContext->Release();
     if (g_pd3dDevice) g_pd3dDevice->Release();
 }
