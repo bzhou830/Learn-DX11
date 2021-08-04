@@ -5,9 +5,12 @@
 #include <DirectXMath.h>
 #include <filesystem>
 #include <wrl/client.h>
+
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_win32.h"
+#include "imgui/imgui_impl_dx11.h"
+
 using namespace std::experimental;
-//template <class T>
-//using ComPtr = Microsoft::WRL::ComPtr<T>;
 using Microsoft::WRL::ComPtr;
 
 #pragma comment(lib, "d3d11.lib")
@@ -57,7 +60,7 @@ HRESULT InitWindow(HINSTANCE hInstance, int nCmdShow);
 HRESULT InitDevice();
 void Render();
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 //--------------------------------------------------------------------------------------
 // Entry point to the program. Initializes everything and goes into a message processing 
@@ -74,6 +77,20 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     if (FAILED(InitDevice()))
         return 0;
 
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsClassic();
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplWin32_Init(g_hWnd);
+    ImGui_ImplDX11_Init(g_pDevice.Get(), g_pContext.Get());
+
     // Main message loop
     MSG msg = { 0 };
     while (WM_QUIT != msg.message)
@@ -85,6 +102,38 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         }
         else
         {
+            // Start the Dear ImGui frame
+            ImGui_ImplDX11_NewFrame();
+            ImGui_ImplWin32_NewFrame();
+            ImGui::NewFrame();
+            
+            // code just for use imgui test.
+            {
+                static bool show_demo_window = false;
+                static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+                static float f = 0.0f;
+                static int counter = 0;
+
+                ImGui::Begin("This is just for test!");                 // Create a window called "Hello, world!" and append into it.
+
+                ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+                ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+
+                ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+                ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+                if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+                    counter++;
+                ImGui::SameLine();
+                ImGui::Text("counter = %d", counter);
+
+                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+                ImGui::End();
+
+                if (show_demo_window)
+                    ImGui::ShowDemoWindow(&show_demo_window);
+            }
+            
             Render();
         }
     }
@@ -481,8 +530,11 @@ void Render()
     // render the second cube.
     g_pContext->DrawIndexed(36, 0, 0);
 
+    ImGui::Render();
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+    
     // Present our back buffer to our front buffer
-    g_pSwapChain->Present(0, 0);
+    g_pSwapChain->Present(1, 0);
 }
 
 
@@ -493,7 +545,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     PAINTSTRUCT ps;
     HDC hdc;
-
+    ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam);
     switch (message)
     {
     case WM_PAINT:
@@ -502,6 +554,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_DESTROY:
+        // Shutdown
+        ImGui_ImplDX11_Shutdown();
+        ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext();
         PostQuitMessage(0);
         break;
 
