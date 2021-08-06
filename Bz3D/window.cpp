@@ -1,5 +1,6 @@
 #include "window.h"
 #include "WindowsMessageMap.h"
+#include "resource.h"
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -16,68 +17,63 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     return S_OK;
 }
 
-window::window(HINSTANCE hInstance, int nCmdShow)
+Window::WindowClass Window::WindowClass::wndClass;
+
+Window::WindowClass::WindowClass() noexcept
+    :hInst(GetModuleHandle(nullptr))
 {
-    InitWindow(hInstance, nCmdShow);
+    WNDCLASSEX wc{ 0 };
+    wc.cbSize = sizeof(wc);
+    wc.style = CS_OWNDC;
+    wc.lpfnWndProc = WndProc;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
+    wc.hInstance = GetInstance();
+    wc.hIcon = LoadIcon(GetInstance(), (LPCTSTR)IDI_ICON1);
+    wc.hCursor = nullptr;
+    wc.hbrBackground = nullptr;
+    wc.lpszMenuName = nullptr;
+    wc.lpszClassName = GetName();
+    wc.hIconSm = LoadIcon(GetInstance(), (LPCTSTR)IDI_ICON1);
+    RegisterClassEx(&wc);
+}
+
+Window::WindowClass::~WindowClass()
+{
+    UnregisterClass(wndClassName, GetInstance());
+}
+
+const char* Window::WindowClass::GetName() noexcept
+{
+    return wndClassName;
+}
+
+HINSTANCE Window::WindowClass::GetInstance() noexcept
+{
+    return wndClass.hInst;
+}
+
+Window::Window(int width, int height, const char* name) noexcept
+{
+    RECT wr{ 0 };
+    wr.left = 100;
+    wr.right = width + wr.left;
+    wr.top = 100;
+    wr.bottom = height + wr.top;
+    AdjustWindowRect(&wr, WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU, FALSE);
+    // create window & get hWnd
+    hWnd = CreateWindow(
+        WindowClass::GetName(), name,
+        WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU,
+        CW_USEDEFAULT, CW_USEDEFAULT, wr.right - wr.left, wr.bottom - wr.top,
+        nullptr, nullptr, WindowClass::GetInstance(), this
+    );
+    // show window
+    ShowWindow(hWnd, SW_SHOWDEFAULT);
 }
 
 
-window::~window()
+Window::~Window()
 {
-}
-
-
-HRESULT window::InitWindow(HINSTANCE hInstance, int nCmdShow)
-{
-    // 注册窗口类
-    WNDCLASSEX wcex;
-    wcex.cbSize = sizeof(WNDCLASSEX);
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc = WndProc;  //指定消息处理函数
-    wcex.cbClsExtra = 0;
-    wcex.cbWndExtra = 0;
-    wcex.hInstance = hInstance;
-    wcex.hIcon = LoadIcon(hInstance, (LPCTSTR)IDI_APPLICATION);
-    wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wcex.lpszMenuName = NULL;
-    wcex.lpszClassName = "Bz3DWindowClass";
-    wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_APPLICATION);
-    if (!RegisterClassEx(&wcex))
-        return E_FAIL;
-
-    // 创建窗口
-    RECT rc{ 0, 0, 640, 480 };
-    AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-    HWND hWND = CreateWindow("Bz3DWindowClass",
-        "Bz3D",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        rc.right - rc.left,
-        rc.bottom - rc.top,
-        NULL,
-        NULL,
-        hInstance,
-        NULL);
-
-    // 显示窗口
-    ShowWindow(hWND, nCmdShow);
-    return S_OK;
-}
-
-
-int window::Run()
-{
-    //消息循环
-    MSG msg{ 0 };
-    while (WM_QUIT != msg.message)
-    {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-    }
-    return 0;
+    DestroyWindow(hWnd);
 }

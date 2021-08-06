@@ -6,7 +6,7 @@
 2. NVSDK中的案例和说明
 3. tiger book
 4. 闫令祺大佬的games101课程
-5. 个人博客： https://binean.top
+5. 个人博客： http://binean.top
 
 ## 00_DX11_SimpleInit
 这个案例相当于学习C语言时候的hello world, 主要是创建窗口，创建DX Device, 初步了解DX的render pipline.
@@ -20,7 +20,7 @@
 ## 03_DX11_Cube
 在02的基础上画一个正方体，了解HLSL Shader的编写，CB的使用，理解MVP变换。
 
-## 04_DX_Transformation
+## 04_DX11_Transformation
 在03的基础上再加一个正方体，缩放这个新添加的正方体，然后让这个新添加的正方体围绕着原正方体转动。目的：理解和应用坐标系的变换。
 
 

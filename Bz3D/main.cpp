@@ -7,6 +7,16 @@ int WinMain(HINSTANCE hInstance,
     LPSTR lpCmdLine, 
     int nShowCmd)
 {
-    window app{ hInstance, nShowCmd };
-    return app.Run();
+    Window window{ 800, 600, "Box" };
+
+    MSG msg{ 0 };
+    while (WM_QUIT != msg.message)
+    {
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+    return static_cast<int>(msg.wParam);
 }
